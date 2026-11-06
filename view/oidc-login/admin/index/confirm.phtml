@@ -1,0 +1,20 @@
+<?php
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+echo $this->pageTitle($translate('Link everyone whose email matches'));
+?>
+<?php if (!$this->plan): ?>
+<p><?php echo $escape($translate('Nobody to link: no unlinked user has the same verified email at the provider.')); ?></p>
+<p><?php echo $this->hyperlink($translate('Back'), $this->url('admin/oidc-login')); ?></p>
+<?php else: ?>
+<p><?php echo $escape(sprintf($translate('These %d people will wait for their first log-in with the %s shown. Check the list, then confirm.'), count($this->plan), $this->account)); ?></p>
+<table class="tablesaw"><thead><tr><th><?php echo $escape($translate('Name')); ?></th><th><?php echo $escape($translate('Email')); ?></th><th><?php echo $escape($translate('Username')); ?></th></tr></thead><tbody>
+<?php foreach ($this->plan as $p): ?><tr><td><?php echo $escape($p['name']); ?></td><td><?php echo $escape($p['email']); ?></td><td><strong><?php echo $escape($p['username']); ?></strong></td></tr><?php endforeach; ?>
+</tbody></table>
+<form method="post" action="<?php echo $escape($this->url('admin/oidc-login')); ?>">
+<input type="hidden" name="oidclogin_admin" value="<?php echo $escape($this->csrf); ?>">
+<input type="hidden" name="do" value="bulk-apply">
+<button type="submit"><?php echo $escape($translate('Confirm')); ?></button>
+<?php echo $this->hyperlink($translate('Cancel'), $this->url('admin/oidc-login'), ['style' => 'margin-left:12px']); ?>
+</form>
+<?php endif; ?>

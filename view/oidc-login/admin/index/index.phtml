@@ -1,0 +1,205 @@
+<?php
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+echo $this->pageTitle($translate('Log-in accounts'));
+$labels = [
+    'linked' => $translate('Linked'),
+    'waiting' => $translate('Waiting for the first log-in'),
+    'none' => $translate('Not linked'),
+];
+$dir = $this->dir;
+$checks = [
+    'found' => ['✓', $translate('Has an account'), 'ok'],
+    'ok' => ['✓', $translate('Account exists'), 'ok'],
+    'missing' => ['✗', $translate('No account — create it at the provider first'), 'bad'],
+    'gone' => ['✗', $translate('Account no longer exists'), 'bad'],
+    'mismatch' => ['⚠', $translate('Same name, different email'), 'warn'],
+    'renamed' => ['⚠', $translate('Username changed at the provider'), 'warn'],
+    'unknown' => ['?', $translate('Could not check'), 'unk'],
+];
+$issuer = rtrim((string) $this->setting('oidclogin_issuer', ''), '/');
+?>
+<style>
+.oidc-table td, .oidc-table th { vertical-align: middle; }
+.oidc-status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.oidc-status.linked { background: #d9f2df; color: #1d5e2c; }
+.oidc-status.waiting { background: #fff1cc; color: #7a5300; }
+.oidc-status.none { background: #eee; color: #555; }
+.oidc-table input[type=text] { width: 11em; max-width: 100%; }
+.oidc-table td:nth-child(2) { word-break: break-all; }
+.oidc-table .oidc-use { display: block; margin-top: 4px; font-size: 12px; padding: 2px 8px; white-space: nowrap; }
+.oidc-inactive td { opacity: .55; }
+.oidc-check { display: inline-block; max-width: 13em; white-space: normal; font-size: 12px; line-height: 1.3; }
+.oidc-check.ok { color: #1d5e2c; } .oidc-check.bad { color: #a11; } .oidc-check.warn { color: #8a5a00; } .oidc-check.unk { color: #777; }
+.oidc-steps { background: #f4f6f8; border-radius: 6px; padding: 10px 14px; }
+.oidc-banner { padding: 8px 12px; border-radius: 6px; margin: 8px 0; }
+.oidc-banner.ok { background: #e8f5ec; } .oidc-banner.bad { background: #fdecea; }
+/* not trouble, only something to know: grey, not red (red would read as an error) */
+.oidc-banner.note { background: #f1f3f5; color: #3d4650; }
+.oidc-quiet { font-size: 12px; color: #7a8590; margin: 4px 0; }
+.oidc-guess { font-size: 11px; color: #8a5a00; }
+/* a filled-in name that is not saved yet: plain to see, and the way to save it in sight */
+.oidc-table input[type=text].oidc-dirty { background: #fff7d6; border-color: #c99a00; font-style: normal; }
+.oidc-table input[type=text]::placeholder { font-style: italic; color: #aaa; }
+.oidc-unsaved { position: sticky; bottom: 0; z-index: 5; display: none; align-items: center; gap: 12px;
+  padding: 10px 14px; margin-top: 8px; background: #fff7d6; border: 1px solid #c99a00; border-radius: 6px; }
+.oidc-unsaved.on { display: flex; }
+.oidc-groups { margin: 10px 0; padding: 8px 12px; border: 1px solid #dfe3e8; border-radius: 6px; }
+.oidc-groups summary { cursor: pointer; }
+.oidc-groups .oidc-grp input[type=text] { width: 16em; max-width: 100%; }
+.oidc-groups .oidc-grp td { vertical-align: middle; }
+</style>
+<ol class="oidc-steps">
+<li><?php echo $escape(sprintf($translate('Create the person at the provider%s.'), $issuer !== '' ? '' : '')); ?><?php if ($issuer !== ''): ?> <a href="<?php echo $escape($issuer . '/settings/admin/users'); ?>" target="_blank" rel="noopener"><?php echo $escape($translate('Open the provider’s users')); ?></a><?php endif; ?></li>
+<li><?php echo $escape(sprintf($translate('Choose their %s here and press Save.'), $this->account)); ?></li>
+<li><?php echo $escape($translate('Send them a login code from the provider. They are linked the first time they log in.')); ?></li>
+</ol>
+<?php if ($dir['ok']): ?>
+<p class="oidc-banner ok"><?php echo $escape(sprintf($translate('Checked against the provider’s list (%1$s, %2$d people, %3$s).'), $dir['source'] === 'api' ? $translate('live') : $translate('pasted list'), count($dir['people']), $dir['at'] ? date('Y-m-d H:i', $dir['at']) : '–')); ?>
+ <?php if ($dir['source'] === 'api'): ?><a href="<?php echo $escape($this->url('admin/oidc-login', [], ['query' => ['refresh' => 1]])); ?>"><?php echo $escape($translate('Refresh')); ?></a><?php endif; ?></p>
+<?php if ($dir['source'] === 'api'): ?><p class="oidc-banner bad">⚠ <?php echo $escape($translate('This page reads the list with an API key. In Pocket ID an API key has every right of the admin who made it (there is no read-only key): anyone who can read config/local.config.php can control all log-ins. Prefer the pasted list below, or keep that file readable only by the web server.')); ?></p><?php endif; ?>
+<?php else: ?>
+<p class="oidc-banner note"><?php echo $escape($translate('Not checked with the provider. To check, paste its user list at the bottom of this page or add an API key.')); ?><?php if ($dir['error'] && $dir['error'] !== 'no list'): ?> <span class="oidc-quiet">(<?php echo $escape($dir['error']); ?>)</span><?php endif; ?></p>
+<?php endif; ?>
+<details class="oidc-groups"<?php echo $this->auto ? ' open' : ''; ?>>
+<summary><b><?php echo $escape($translate('Accounts from provider groups')); ?></b> · <?php echo $escape($this->auto ? $translate('on') : $translate('off')); ?></summary>
+<p><?php echo $escape(sprintf($translate('When this is on, someone who logs in with their %s and is not linked here yet is let in by their groups at the provider: linked to the one user here with the same email address, or given a new user (their name and email from the provider, active). Their role is the highest role their groups have below, and it is set again at every log-in: out of every group here, they cannot log in (the user stays). Users linked by hand are never changed. Off: as before, only linked users log in.'), $this->account)); ?></p>
+<?php if ($this->auto && !$this->groupRoles): ?>
+<p class="oidc-banner bad"><?php echo $escape($translate('This is on, but no group is in the table: nobody new can come in until a row is saved.')); ?></p>
+<?php endif; ?>
+<?php if ($this->selfEditOff === true): ?>
+<p class="oidc-quiet">✓ <?php echo $escape($translate('Self-account editing is off at the provider (checked), so matching by email is safe.')); ?></p>
+<?php elseif ($this->selfEditOff === false): ?>
+<p class="oidc-banner bad"><?php echo $escape($translate('Self-account editing is ON at the provider: people can change their own email there and could take over a user here by email. Turn it off in Pocket ID: Application Configuration → “Enable self-account editing”.')); ?></p>
+<?php elseif ($this->selfEditSaid): ?>
+<p class="oidc-quiet">✓ <?php echo $escape($translate('You said self-account editing is off at the provider, so matching by email is safe.')); ?></p>
+<?php else: ?>
+<p class="oidc-banner note"><?php echo $escape($translate('Matching by email is safe only when people cannot change their own email at the provider. In Pocket ID: Application Configuration → “Enable self-account editing” off. Tick the box below once it is.')); ?></p>
+<?php endif; ?>
+<form method="post"><input type="hidden" name="oidclogin_admin" value="<?php echo $escape($this->csrf); ?>"><input type="hidden" name="do" value="groups">
+<p><label><input type="checkbox" name="auto" value="1"<?php echo $this->auto ? ' checked' : ''; ?>> <?php echo $escape($translate('Let people in by their provider groups')); ?></label></p>
+<?php if ($this->selfEditOff === null): ?>
+<p><label><input type="checkbox" name="selfedit_off" value="1"<?php echo $this->selfEditSaid ? ' checked' : ''; ?>> <?php echo $escape($translate('I have turned off self-account editing at the provider')); ?></label></p>
+<?php else: ?><input type="hidden" name="selfedit_off" value="<?php echo $this->selfEditSaid ? '1' : ''; ?>"><?php endif; ?>
+<table class="tablesaw oidc-grp" style="max-width:640px"><thead><tr><th><?php echo $escape($translate('Provider group (as the provider names it)')); ?></th><th><?php echo $escape($translate('Omeka role')); ?></th></tr></thead><tbody id="oidc-grp-rows">
+<?php /* every saved row, and always three empty ones under them (no script needed); with a
+   script one more appears whenever the last is filled in, and "Add a row" adds one */
+$rows = []; foreach ($this->groupRoles as $g => $r) { $rows[] = [$g, $r]; } for ($i = 0; $i < 3; $i++) { $rows[] = ['', '']; } ?>
+<?php foreach ($rows as $i => [$g, $r]): ?>
+<tr><td><input type="text" name="grp[<?php echo $i; ?>]" value="<?php echo $escape($g); ?>" placeholder="<?php echo $escape($translate('e.g. staff')); ?>" autocomplete="off" spellcheck="false"></td>
+<td><select name="grprole[<?php echo $i; ?>]"><option value=""><?php echo $escape($translate('—')); ?></option><?php foreach ($this->roleLabels as $rid => $rl): ?><option value="<?php echo $escape($rid); ?>"<?php echo $rid === $r ? ' selected' : ''; ?>><?php echo $escape($translate($rl)); ?></option><?php endforeach; ?></select></td></tr>
+<?php endforeach; ?>
+</tbody></table>
+<p><button type="button" id="oidc-grp-add" hidden><?php echo $escape($translate('Add a row')); ?></button></p>
+<p class="oidc-guess"><?php echo $escape($translate('Several groups: the highest role wins. Global Administrator only from a row that says so. Leave the group empty to remove a row. The provider must send the groups claim (scope “groups”).')); ?></p>
+<button type="submit"><?php echo $escape($translate('Save groups')); ?></button>
+</form>
+</details>
+<?php if ($this->emailMatches): ?>
+<form method="post" style="margin:8px 0"><input type="hidden" name="oidclogin_admin" value="<?php echo $escape($this->csrf); ?>"><input type="hidden" name="do" value="bulk-preview">
+<button type="submit"><?php echo $escape(sprintf($translate('Link everyone whose email matches (%d)…'), $this->emailMatches)); ?></button></form>
+<?php endif; ?>
+<?php if ($dir['ok']): ?><datalist id="oidc-people"><?php foreach ($this->people as $p): if ($p['disabled']) continue; ?><option value="<?php echo $escape($p['username']); ?>"><?php echo $escape(trim($p['name'] . ' ' . $p['email'])); ?></option><?php endforeach; ?></datalist><?php endif; ?>
+<form method="post">
+<input type="hidden" name="oidclogin_admin" value="<?php echo $escape($this->csrf); ?>">
+<table class="tablesaw oidc-table">
+<thead><tr>
+<th><?php echo $escape($translate('Name')); ?></th>
+<th><?php echo $escape($translate('Email')); ?></th>
+<th><?php echo $escape($translate('Role')); ?></th>
+<th><?php echo $escape($translate('Status')); ?></th>
+<th><?php echo $escape(sprintf($translate('At the provider'))); ?></th>
+<th><?php echo $escape(sprintf($translate('%s username'), ucfirst($this->account))); ?></th>
+</tr></thead>
+<tbody>
+<?php foreach ($this->rows as $r): ?>
+<tr class="<?php echo $r['active'] ? '' : 'oidc-inactive'; ?>" data-user="<?php echo (int) $r['id']; ?>">
+<td><?php echo $this->hyperlink($r['name'], $this->url('admin/id', ['controller' => 'user', 'id' => $r['id']])); ?><?php if (!$r['active']): ?> <em>(<?php echo $escape($translate('inactive')); ?>)</em><?php endif; ?></td>
+<td><?php echo $escape($r['email']); ?></td>
+<td><?php echo $escape($r['role']); ?></td>
+<td><span class="oidc-status <?php echo $r['status']; ?>"><?php echo $escape($labels[$r['status']]); ?></span></td>
+<td><?php [$sym, $txt, $cls] = $checks[$r['check']]; ?><span class="oidc-check <?php echo $cls; ?>"><?php echo $sym . ' ' . $escape($txt); ?><?php if ($r['match'] && $r['status'] === 'none'): ?><br><code><?php echo $escape($r['match']['username']); ?></code><?php endif; ?></span></td>
+<td>
+<?php if ($r['status'] === 'linked'): ?>
+  <strong><?php echo $escape($r['username']); ?></strong>
+  <label style="margin-left:8px"><input type="checkbox" name="unlink[<?php echo (int) $r['id']; ?>]" value="1"> <?php echo $escape($translate('Unlink')); ?></label>
+<?php else: ?>
+  <input type="text" name="waiting[<?php echo (int) $r['id']; ?>]" value="<?php echo $escape($r['username']); ?>"
+    list="<?php echo $dir['ok'] ? 'oidc-people' : 'oidc-s-' . (int) $r['id']; ?>" placeholder="<?php echo $escape($translate('username')); ?>" autocomplete="off" <?php echo $r['active'] ? '' : 'disabled'; ?>>
+  <?php if (!$dir['ok']): ?><datalist id="oidc-s-<?php echo (int) $r['id']; ?>"><?php foreach ($r['suggest'] as $s): ?><option value="<?php echo $escape($s); ?>"><?php endforeach; ?></datalist><?php endif; ?>
+  <?php $best = $r['suggest'][0] ?? ''; if ($r['active'] && $best !== '' && $r['username'] === ''): ?>
+  <button type="button" class="oidc-use" data-value="<?php echo $escape($best); ?>"><?php echo $escape(sprintf($translate('Use %s'), $best)); ?><?php echo $dir['ok'] ? ' ✓' : ''; ?></button>
+  <?php if (!$dir['ok']): ?><span class="oidc-guess"><?php echo $escape($translate('guess — check at the provider')); ?></span><?php endif; ?>
+  <?php endif; ?>
+<?php endif; ?>
+</td>
+</tr>
+<?php endforeach; ?>
+</tbody>
+</table>
+<div class="oidc-unsaved" role="status"><span><?php echo $escape($translate('Not saved yet — press Save to link them.')); ?></span><button type="submit"><?php echo $escape($translate('Save')); ?></button></div>
+<p><button type="submit"><?php echo $escape($translate('Save')); ?></button></p>
+</form>
+<?php if ($this->seen): ?>
+<h3><?php echo $escape($translate('Tried to log in but not linked yet')); ?></h3>
+<ul>
+<?php foreach ($this->seen as $s): ?>
+<li><code><?php echo $escape($s['username'] ?? ''); ?></code> — <?php echo $escape(trim(($s['name'] ?? '') . ' ' . (($s['email'] ?? '') !== '' ? '<' . $s['email'] . '>' : ''))); ?> · <?php echo $escape(date('Y-m-d H:i', (int) ($s['at'] ?? 0))); ?></li>
+<?php endforeach; ?>
+</ul>
+<?php endif; ?>
+<?php if ($this->history): ?>
+<h3><?php echo $escape($translate('Recent changes')); ?></h3>
+<ul style="font-size:13px">
+<?php foreach ($this->history as $h): ?><li><?php echo $escape(date('Y-m-d H:i', (int) $h['at']) . ' · ' . $h['action'] . ' · #' . $h['user'] . ($h['username'] !== '' ? ' → ' . $h['username'] : '') . ' · ' . $h['by']); ?></li><?php endforeach; ?>
+</ul>
+<?php endif; ?>
+<details style="margin-top:16px"<?php echo $dir['ok'] ? '' : ' open'; ?>>
+<summary><?php echo $escape($translate('The provider’s user list (paste)')); ?></summary>
+<p><?php echo $escape($translate('One person per line: username, email, name — e.g. “jane.do jane@example.org Jane Doe”. Used when no API key is set. No secret is needed.')); ?></p>
+<form method="post"><input type="hidden" name="oidclogin_admin" value="<?php echo $escape($this->csrf); ?>"><input type="hidden" name="do" value="paste">
+<textarea name="paste" rows="6" style="width:100%"><?php echo $escape($this->pasted); ?></textarea>
+<button type="submit"><?php echo $escape($translate('Save list')); ?></button></form>
+</details>
+<script>
+/* the groups table: a new empty row whenever the last one is filled in, and "Add a row" */
+(function () {
+  var body = document.getElementById('oidc-grp-rows'), add = document.getElementById('oidc-grp-add');
+  if (!body || !add) { return; }
+  var next = body.rows.length;
+  function more() {
+    var last = body.rows[body.rows.length - 1], row = last.cloneNode(true);
+    row.querySelectorAll('input, select').forEach(function (el) {
+      el.name = el.name.replace(/\[\d+\]$/, '[' + next + ']');
+      if (el.tagName === 'SELECT') { el.selectedIndex = 0; } else { el.value = ''; }
+    });
+    next++;
+    body.appendChild(row);
+    return row;
+  }
+  add.hidden = false;
+  add.addEventListener('click', function () { var r = more(); r.querySelector('input').focus(); });
+  body.addEventListener('input', function (e) {
+    var last = body.rows[body.rows.length - 1];
+    if (last.contains(e.target) && last.querySelector('input').value.trim() !== '') { more(); }
+  });
+})();
+function oidcDirty(i) {
+  i.classList.toggle('oidc-dirty', i.value !== i.defaultValue);
+  var any = document.querySelector('.oidc-table input.oidc-dirty, .oidc-table input[name^=unlink]:checked');
+  var bar = document.querySelector('.oidc-unsaved');
+  if (bar) { bar.classList.toggle('on', !!any); }
+}
+document.querySelectorAll('.oidc-table input[type=text]').forEach(function (i) {
+  i.addEventListener('input', function () { oidcDirty(i); });
+});
+document.querySelectorAll('.oidc-table input[name^=unlink]').forEach(function (c) {
+  c.addEventListener('change', function () { oidcDirty(c); });
+});
+document.querySelectorAll('.oidc-use').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var i = b.parentNode.querySelector('input[type=text]');
+    if (i) { i.value = b.getAttribute('data-value'); i.focus(); oidcDirty(i); }
+  });
+});
+</script>

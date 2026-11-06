@@ -1,0 +1,15 @@
+<?php
+$translate = $this->plugin('translate');
+$this->htmlElement('body')->appendAttribute('class', 'login');
+?>
+<h1><?php echo $translate('Log in'); ?></h1>
+<?php if ($this->message === 'This account is not linked yet'): ?>
+<p class="error"><?php echo $this->escapeHtml(sprintf($translate('This %s is not linked yet'), $this->account)); ?></p>
+<p><?php echo $this->escapeHtml(sprintf($translate('Log in with your password, open your account page and press “Link %s”. Or ask an administrator to link it.'), $this->account)); ?></p>
+<?php elseif ($this->message === 'This account is not in a group that may log in here'): ?>
+<p class="error"><?php echo $this->escapeHtml(sprintf($translate('This %s is not in a group that may log in here'), $this->account)); ?></p>
+<p><?php echo $this->escapeHtml($translate('Ask an administrator to add you to the right group at the provider.')); ?></p>
+<?php else: ?>
+<p class="error"><?php echo $this->escapeHtml($translate($this->message)); ?></p>
+<?php endif; ?>
+<p><?php echo $this->hyperlink($translate('Log in with your password'), $this->url('login')); ?></p>

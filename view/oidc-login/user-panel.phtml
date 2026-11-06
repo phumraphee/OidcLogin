@@ -1,0 +1,26 @@
+<?php
+/* On a user's page in admin: the person's own link status, with Link / Unlink. */
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+?>
+<div class="oidc-panel" style="margin:1.5em 0;padding:1em;border:1px solid #ddd;border-radius:4px">
+<h3 style="margin-top:0"><?php echo $escape(ucfirst($this->account)); ?></h3>
+<?php if ($this->subject): ?>
+  <p><?php echo $escape(sprintf($translate('Linked to %s.'), $this->username ?: '?')); ?></p>
+  <?php if ($this->own): ?>
+  <form method="post" action="<?php echo $escape($this->url('oidc-login', ['action' => 'unlink'])); ?>">
+    <input type="hidden" name="oidclogin_unlink" value="<?php echo $escape($this->csrf); ?>">
+    <input type="hidden" name="redirect_url" value="<?php echo $escape($this->back); ?>">
+    <button type="submit"><?php echo $escape(sprintf($translate('Unlink %s'), $this->account)); ?></button>
+  </form>
+  <?php endif; ?>
+<?php else: ?>
+  <p><?php echo $escape($translate('Not linked.')); ?><?php if ($this->username): ?> <?php echo $escape(sprintf($translate('Waiting for the first log-in as %s.'), $this->username)); ?><?php endif; ?></p>
+  <?php if ($this->own): ?>
+  <p><a class="button" href="<?php echo $escape($this->url('oidc-login', ['action' => 'link'], ['query' => ['redirect_url' => $this->back]])); ?>"><?php echo $escape(sprintf($translate('Link %s'), $this->account)); ?></a></p>
+  <?php endif; ?>
+<?php endif; ?>
+<?php if ($this->isAdmin): ?>
+  <p><?php echo $this->hyperlink($translate('All linked accounts'), $this->url('admin/oidc-login')); ?></p>
+<?php endif; ?>
+</div>

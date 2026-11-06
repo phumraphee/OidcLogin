@@ -1,0 +1,21 @@
+<?php
+/* Omeka's own login page (application/view/omeka/login/login.phtml, Omeka S 4.2) with
+   one link added above the form. The password form is untouched. */
+$translate = $this->plugin('translate');
+$this->htmlElement('body')->appendAttribute('class', 'login');
+$ready = (string) $this->setting('oidclogin_issuer', '') !== '';
+$label = \OidcLogin\Stdlib\Rules::buttonLabel(
+    (string) ($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''),
+    (string) $this->setting('oidclogin_button', ''),
+    (string) $this->setting('oidclogin_button_th', ''),
+    (string) $this->setting('oidclogin_account', ''),
+    (string) $this->setting('oidclogin_account_th', '')
+);
+$redirect = (string) $this->params()->fromQuery('redirect_url', '');
+?>
+<h1><?php echo $translate('Log in'); ?></h1>
+<?php if ($ready): ?>
+<p class="oidc-login"><a class="button" href="<?php echo $this->escapeHtml($this->url('oidc-login', ['action' => 'login'], $redirect !== '' ? ['query' => ['redirect_url' => $redirect]] : [])); ?>"><?php echo $this->escapeHtml($label); ?></a></p>
+<?php endif; ?>
+<?php echo $this->form($form); ?>
+<p class="forgot-password"><?php echo $this->hyperlink($translate('Forgot password?'), $this->url('forgot-password')); ?></p>
