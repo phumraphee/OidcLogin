@@ -10,9 +10,11 @@ namespace OidcLogin\Stdlib;
  * With the ID token of this log-in and the provider's end_session_endpoint, the provider is
  * told which log-in this was (id_token_hint: it ends this app's tokens there) and, with no
  * Logout Callback URL registered for the client, shows its own "log out?" page. Without
- * them: the provider's /logout page itself (Pocket ID). No post_logout_redirect_uri: the
- * person stays on the provider's page — coming back to the app at once would let the next
- * person in with one click while the provider still knows the browser.
+ * them: the provider's /logout page itself (Pocket ID). Pocket ID 2.19.3 and later end the
+ * browser's log-in there at once (no "log out?" question any more; its /logout page then only
+ * shows its sign-in), so the request also carries post_logout_redirect_uri = our callback
+ * (withReturn): with that URL among the client's Logout Callback URLs the person comes back
+ * to the app, already logged out of the provider too.
  *
  * Plain PHP (tests/run.php).
  */
@@ -31,6 +33,20 @@ class ProviderLogout
             return $endSession . (strpos($endSession, '?') === false ? '?' : '&') . 'id_token_hint=' . rawurlencode($idToken);
         }
         return $issuer . '/logout';
+    }
+
+    /**
+     * The end-session URL with the way back: post_logout_redirect_uri (our callback) and state.
+     * Only for the end-session endpoint (it carries id_token_hint); the provider's plain /logout
+     * page, or a callback that is not https (http on localhost for tests), stays as it is.
+     */
+    public static function withReturn(string $end, string $redirectUri, string $state): string
+    {
+        if ($end === '' || strpos($end, 'id_token_hint=') === false || $state === ''
+            || !preg_match('~^(https://[^/\s?#]+|http://(localhost|127\.0\.0\.1)(:\d+)?)(/\S*)?$~i', $redirectUri)) {
+            return $end;
+        }
+        return $end . '&' . http_build_query(['post_logout_redirect_uri' => $redirectUri, 'state' => $state], '', '&', PHP_QUERY_RFC3986);
     }
 
     /**

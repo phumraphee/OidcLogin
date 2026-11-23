@@ -162,6 +162,14 @@ t('linked pasted (no ids)', Rules::checkLinked($pp, 'u1', 'sam.ok'), '');
 $es = 'https://id.example.org/api/oidc/end-session';
 t('logout: end-session with the ID token', ProviderLogout::url('https://id.example.org', $es, 'aa.bb.cc'), $es . '?id_token_hint=aa.bb.cc');
 t('logout: never a post_logout_redirect_uri', strpos(ProviderLogout::url('https://id.example.org', $es, 'aa.bb.cc'), 'post_logout') === false, true);
+$cb = 'https://archive.example.org/oidc/callback';
+t('withReturn: end-session gets the way back + state', ProviderLogout::withReturn($es . '?id_token_hint=aa.bb.cc', $cb, 'st1'),
+  $es . '?id_token_hint=aa.bb.cc&post_logout_redirect_uri=' . rawurlencode($cb) . '&state=st1');
+t('withReturn: the plain /logout page stays as it is', ProviderLogout::withReturn('https://id.example.org/logout', $cb, 'st1'), 'https://id.example.org/logout');
+t('withReturn: no state → unchanged', ProviderLogout::withReturn($es . '?id_token_hint=aa.bb.cc', $cb, ''), $es . '?id_token_hint=aa.bb.cc');
+t('withReturn: an http callback (not localhost) → unchanged', ProviderLogout::withReturn($es . '?id_token_hint=aa.bb.cc', 'http://archive.example.org/oidc/callback', 's'), $es . '?id_token_hint=aa.bb.cc');
+t('withReturn: http on localhost (tests) is allowed', strpos(ProviderLogout::withReturn($es . '?id_token_hint=aa.bb.cc', 'http://localhost:8080/oidc/callback', 's'), 'post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A8080') !== false, true);
+t('withReturn: empty end → empty', ProviderLogout::withReturn('', $cb, 's'), '');
 t('logout: no token → the provider\'s /logout', ProviderLogout::url('https://id.example.org/', $es, ''), 'https://id.example.org/logout');
 t('logout: no end-session → /logout', ProviderLogout::url('https://id.example.org', '', 'aa.bb.cc'), 'https://id.example.org/logout');
 t('logout: end-session on another host → /logout', ProviderLogout::url('https://id.example.org', 'https://evil.example/end', 'aa.bb.cc'), 'https://id.example.org/logout');

@@ -132,11 +132,28 @@ class LoginController extends AbstractActionController
         $probe = \OidcLogin\Stdlib\ProviderLogout::open((string) ($_COOKIE[\OidcLogin\Stdlib\ProviderLogout::COOKIE] ?? ''),
             (string) ($this->config['client_secret'] ?? ''), time(), self::TTL);
         if ($probe && hash_equals($probe['state'], (string) $this->params()->fromQuery('state', ''))) {
-            $this->getResponse()->getHeaders()->addHeaderLine('Set-Cookie', \OidcLogin\Stdlib\ProviderLogout::COOKIE . '=; Path=/oidc/; Max-Age=0; HttpOnly; SameSite=Lax');
             $code = (string) $this->params()->fromQuery('code', '');
             if ($code !== '' && !$this->params()->fromQuery('error') && $probe['end'] !== '') {
-                return $this->redirect()->toUrl($probe['end']);
+                /* On to the provider's end-session, asking it to come back here afterwards
+                   (post_logout_redirect_uri = this callback, with the same state): Pocket ID 2.19.3+
+                   ends its own log-in in this browser at once and, when this callback is one of the
+                   client's Logout Callback URLs, sends the browser back — the cookie, now with
+                   nothing left to end, then finishes like "no log-in there" below. Without a
+                   registered URL the provider shows its own page, as before. */
+                try {
+                    $redirect = $this->redirectUri();
+                } catch (\Throwable $e) {
+                    $redirect = '';
+                }
+                $to = \OidcLogin\Stdlib\ProviderLogout::withReturn($probe['end'], $redirect, $probe['state']);
+                $secure = stripos($redirect, 'https://') === 0 ? '; Secure' : '';
+                $this->getResponse()->getHeaders()->addHeaderLine('Set-Cookie', \OidcLogin\Stdlib\ProviderLogout::COOKIE . '='
+                    . \OidcLogin\Stdlib\ProviderLogout::seal(['state' => $probe['state'], 'end' => '', 'at' => time(), 'back' => $probe['back'] ?? ''],
+                        (string) ($this->config['client_secret'] ?? ''))
+                    . '; Path=/oidc/; Max-Age=' . self::TTL . '; HttpOnly; SameSite=Lax' . $secure);
+                return $this->redirect()->toUrl($to);
             }
+            $this->getResponse()->getHeaders()->addHeaderLine('Set-Cookie', \OidcLogin\Stdlib\ProviderLogout::COOKIE . '=; Path=/oidc/; Max-Age=0; HttpOnly; SameSite=Lax');
             // nothing to end at the provider: back to the page Log out was pressed on, when it said
             if (($probe['back'] ?? '') !== '') {
                 return $this->redirect()->toUrl($probe['back']);

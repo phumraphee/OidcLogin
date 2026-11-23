@@ -11,7 +11,10 @@ returns is set by POST /_scenario with JSON, e.g.
    "userinfo_sub": null, "reuse_code": false}
 GET /_log returns what the provider saw (for assertions).
 
-Logout, as Pocket ID 2.19.1 does it (2026-10-22): the browser's log-in at the provider is a
+Logout (scenario "logout_mode": "ends" = Pocket ID 2.19.3: end-session ends the browser's log-in
+at once and goes to the scenario's "logout_callbacks" URL — the post_logout_redirect_uri asked
+for, plus state — or to /logout, which then shows only the sign-in page). Default "confirm",
+as Pocket ID 2.19.1 does it (2026-10-22): the browser's log-in at the provider is a
 cookie (mock_sid), made at the first /authorize. GET /api/oidc/end-session notes the
 id_token_hint and sends the browser to /logout (no Logout Callback URL registered); GET
 /logout is the "log out?" page, POST /logout ends the browser's log-in. With the scenario's
@@ -115,12 +118,41 @@ class H(BaseHTTPRequestHandler):
             return
         if u.path == "/api/oidc/end-session":
             self.note("end_session", **q)
+            with LOCK:
+                mode = STATE["scenario"].get("logout_mode", "confirm")
+                cbs = list(STATE["scenario"].get("logout_callbacks") or [])
+            if mode != "ends":
+                self.send_response(302)
+                self.send_header("Location", iss + "/logout")
+                self.end_headers()
+                return
+            # Pocket ID 2.19.3: the browser's log-in ends here at once (cookie cleared); then the
+            # client's Logout Callback URL (the one asked for, or the first), else /logout
+            want = q.get("post_logout_redirect_uri", "")
+            if cbs and want and want not in cbs:
+                self.note("end_session_bad_callback")
+                self.send_response(302)                      # an error: the manual "log out?" page, log-in kept
+                self.send_header("Location", iss + "/logout")
+                self.end_headers()
+                return
+            sid = self.cookie("mock_sid")
+            with LOCK:
+                STATE["sessions"].discard(sid)
+            to = iss + "/logout"
+            if cbs:
+                to = want or cbs[0]
+                if q.get("state"):
+                    to += ("&" if "?" in to else "?") + urllib.parse.urlencode({"state": q["state"]})
             self.send_response(302)
-            self.send_header("Location", iss + "/logout")
+            self.send_header("Location", to)
+            self.send_header("Set-Cookie", "mock_sid=; Path=/; Max-Age=0; Secure; HttpOnly")
             self.end_headers()
             return
         if u.path == "/logout":
             self.note("logout_page")
+            if self.cookie("mock_sid") not in STATE["sessions"]:
+                # Pocket ID's /logout with nobody signed in: its sign-in page (the 2026-11-23 bug)
+                return self.send_html("<h1>Sign in</h1><p>login required</p>")
             return self.send_html('<h1>Log out?</h1><form method="post" action="/logout"><button>Log out</button></form>')
         if u.path == "/userinfo":
             auth = self.headers.get("Authorization", "")

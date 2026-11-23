@@ -93,18 +93,22 @@ Omeka's own Logout runs as always and ends Omeka's session first. For a person w
 with the provider (remembered at log-in, in Omeka's session), the provider is asked first
 whether this browser still has a log-in there — an authorization request with `prompt=none`,
 answered at once back to `/oidc/callback` (its code is never used). No log-in there any more
-(`login_required`): Omeka's own "Successfully logged out", nothing more to do — the provider's
-`/logout` would only show its sign-in page. Still logged in there: the browser goes to the
-provider's `end_session_endpoint` with this log-in's ID token as `id_token_hint` — no
-`post_logout_redirect_uri` — so the provider ends this app's tokens and shows its own
-"log out?" page (Pocket ID: `/logout`). One press there ends the provider's log-in in that
-browser: on a shared computer, the next press of the button meets the provider's sign-in.
-Without an ID token or an end-session endpoint: `<issuer>/logout`. Other apps keep their own
-sessions. A password log-in logs out as before (Omeka's login page). The provider being down
-never stops a logout: nothing is asked of it from the server.
+(`login_required`): Omeka's own "Successfully logged out" (or the public page Log out was
+pressed on, `/logout?redirect_url=<path>`), nothing more to do. Still logged in there: the
+browser goes to the provider's `end_session_endpoint` with this log-in's ID token as
+`id_token_hint`, `post_logout_redirect_uri` = the callback and a `state`. Pocket ID 2.19.3 and
+later end the browser's log-in there at once and come back to the callback, which finishes
+the same way ("Successfully logged out" or the page Log out was pressed on). On a shared
+computer the next press of the button meets the provider's sign-in. Without an ID token or an
+end-session endpoint: `<issuer>/logout`. Other apps keep their own sessions. A password log-in
+logs out as before (Omeka's login page). The provider being down never stops a logout: nothing
+is asked of it from the server.
 
-Leave the client's **Logout Callback URLs** empty in Pocket ID: with one registered, Pocket ID
-sends the browser straight back to the app without ending its own log-in.
+**Pocket ID 2.19.3 or later:** add the callback (e.g. `https://example.org/oidc/callback`, the
+same URL as the client's Callback URL) to the client's **Logout Callback URLs**. Without it
+Pocket ID ends its log-in but then leaves the person on its own sign-in page.
+**Older Pocket ID:** leave Logout Callback URLs empty — there a registered URL sends the browser
+straight back without ending the provider's log-in; the person confirms on its "log out?" page.
 
 ## Checking names against the provider (admin page)
 The "Log-in accounts" page checks each name against the provider's real user list and

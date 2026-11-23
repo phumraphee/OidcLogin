@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1 — 2026-11-23
+
+- Logout with Pocket ID 2.19.3 and later: the end-session request now carries
+  `post_logout_redirect_uri` (the callback) and `state`, so the person comes back to the app
+  logged out of both, instead of ending on the provider's sign-in page (2.19.3 ends its log-in
+  at once and no longer asks "log out?"). Register the callback as a Logout Callback URL of the
+  client (README, Logout).
+
 ## 1.2.0 — 2026-11-06
 
 First public release.
