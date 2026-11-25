@@ -282,6 +282,32 @@ class Rules
         return ['link', (int) $u['id'], ''];
     }
 
+    /**
+     * (1.3.0) What a log-in changes when the provider is the master for name and e-mail: the fields that differ, as
+     * ['name' => new, 'email' => new]. Nothing for an empty or invalid value, an e-mail that only differs in case, or an
+     * e-mail another Omeka user already has ($taken = ids of the OTHER users with it). Pure; the caller writes and logs.
+     *
+     * @param array{name:string,email:string} $user the Omeka user as it is now
+     * @param int[] $taken
+     * @return array<string,string>
+     */
+    public static function profileChanges(array $user, array $info, string $username, array $taken = []): array
+    {
+        $want = [];
+        /* first + last name when the provider gives them, else its `name` */
+        $given = trim((is_string($info['given_name'] ?? null) ? $info['given_name'] : '') . ' ' . (is_string($info['family_name'] ?? null) ? $info['family_name'] : ''));
+        $name = trim((string) preg_replace('/\s+/u', ' ', self::displayName($given !== '' ? ['name' => $given] : $info, '')));
+        if ($name !== '' && $name !== (string) $user['name']) {
+            $want['name'] = $name;
+        }
+        $email = is_string($info['email'] ?? null) ? trim($info['email']) : '';
+        if ($email !== '' && strlen($email) <= 190 && filter_var($email, FILTER_VALIDATE_EMAIL)
+            && strtolower($email) !== strtolower((string) $user['email']) && !$taken) {
+            $want['email'] = $email;
+        }
+        return $want;
+    }
+
     /** The name a new user gets: name, else given + family name, else the username (190 at most). */
     public static function displayName(array $info, string $username): string
     {

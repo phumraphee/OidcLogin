@@ -291,6 +291,10 @@ class LoginController extends AbstractActionController
             }
         }
 
+        /* (1.3.0) The provider is the master for name and e-mail (switch oidclogin_sync_profile, off by default): what differs is
+           written to the user now, with the old values in the log (the undo list). Never a global administrator. */
+        $this->syncProfile($user, $info, $username);
+
         /* The same steps as Omeka's own LoginController after a good password. */
         $sessionManager = Container::getDefaultManager();
         $sessionManager->regenerateId();
@@ -319,6 +323,42 @@ class LoginController extends AbstractActionController
     }
 
     /** Show why, log the detail, offer the password page. Never says more than needed. */
+    /** (1.3.0) See profileChanges(). Never throws: a log-in is never refused for this. */
+    protected function syncProfile(User $user, array $info, string $username): void
+    {
+        try {
+            if (!$this->settings()->get('oidclogin_sync_profile', false) || (string) $user->getRole() === 'global_admin') {
+                return;
+            }
+            $email = is_string($info['email'] ?? null) ? trim($info['email']) : '';
+            $taken = [];
+            if ($email !== '') {
+                foreach ($this->links->usersWithEmail($email) as $other) {
+                    if ((int) $other['id'] !== (int) $user->getId()) {
+                        $taken[] = (int) $other['id'];
+                    }
+                }
+            }
+            $want = Rules::profileChanges(['name' => (string) $user->getName(), 'email' => (string) $user->getEmail()], $info, $username, $taken);
+            if (!$want) {
+                return;
+            }
+            $said = [];
+            if (isset($want['name'])) {
+                $said[] = 'name [' . $user->getName() . '] → [' . $want['name'] . ']';
+                $user->setName($want['name']);
+            }
+            if (isset($want['email'])) {
+                $said[] = 'email [' . $user->getEmail() . '] → [' . $want['email'] . ']';
+                $user->setEmail($want['email']);
+            }
+            $this->entityManager->flush();
+            $this->links->log('profile from provider: ' . implode('; ', $said), (int) $user->getId(), $username, 'provider');
+        } catch (\Throwable $e) {
+            error_log('OidcLogin: profile sync of user ' . $user->getId() . ': ' . $e->getMessage());
+        }
+    }
+
     protected function refuse(string $message, string $detail)
     {
         error_log('OidcLogin: ' . $message . ': ' . $detail);

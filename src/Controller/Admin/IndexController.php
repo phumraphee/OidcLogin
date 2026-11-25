@@ -62,6 +62,11 @@ class IndexController extends AbstractActionController
                 $before = [(bool) $this->settings()->get('oidclogin_auto', false), (array) $this->settings()->get('oidclogin_group_roles', [])];
                 $this->settings()->set('oidclogin_group_roles', $map);
                 $this->settings()->set('oidclogin_auto', $auto);
+                $sync = (bool) $request->getPost('sync_profile');
+                if ($sync !== (bool) $this->settings()->get('oidclogin_sync_profile', false)) {
+                    $this->links->log($sync ? 'name and e-mail follow the provider: on' : 'name and e-mail follow the provider: off', 0, '', $by);
+                }
+                $this->settings()->set('oidclogin_sync_profile', $sync);
                 /* the person's word that self-account editing is off at the provider (when the
                    provider cannot be asked): a quiet line instead of the box */
                 $this->settings()->set('oidclogin_selfedit_off', (bool) $request->getPost('selfedit_off'));
@@ -169,6 +174,7 @@ class IndexController extends AbstractActionController
             'history' => array_slice($this->links->history(), 0, 20),
             'pasted' => $this->directory->pasteText(),
             'auto' => (bool) $this->settings()->get('oidclogin_auto', false),
+            'syncProfile' => (bool) $this->settings()->get('oidclogin_sync_profile', false),
             'selfEditSaid' => (bool) $this->settings()->get('oidclogin_selfedit_off', false),
             'selfEditOff' => $this->directory->selfEditOff(),
             'groupRoles' => (array) $this->settings()->get('oidclogin_group_roles', []),

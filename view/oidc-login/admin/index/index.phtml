@@ -78,6 +78,7 @@ $issuer = rtrim((string) $this->setting('oidclogin_issuer', ''), '/');
 <?php endif; ?>
 <form method="post"><input type="hidden" name="oidclogin_admin" value="<?php echo $escape($this->csrf); ?>"><input type="hidden" name="do" value="groups">
 <p><label><input type="checkbox" name="auto" value="1"<?php echo $this->auto ? ' checked' : ''; ?>> <?php echo $escape($translate('Let people in by their provider groups')); ?></label></p>
+<p><label><input type="checkbox" name="sync_profile" value="1"<?php echo $this->syncProfile ? ' checked' : ''; ?>> <?php echo $escape($translate('Keep name and e-mail the same as at the provider, at every log-in (never a global administrator; the old values stay in the history below)')); ?></label></p>
 <?php if ($this->selfEditOff === null): ?>
 <p><label><input type="checkbox" name="selfedit_off" value="1"<?php echo $this->selfEditSaid ? ' checked' : ''; ?>> <?php echo $escape($translate('I have turned off self-account editing at the provider')); ?></label></p>
 <?php else: ?><input type="hidden" name="selfedit_off" value="<?php echo $this->selfEditSaid ? '1' : ''; ?>"><?php endif; ?>

@@ -221,5 +221,15 @@ t('name: name claim', Rules::displayName(['name' => ' Jane Doe '], 'jane'), 'Jan
 t('name: given + family', Rules::displayName(['given_name' => 'Jane', 'family_name' => 'Doe'], 'jane'), 'Jane Doe');
 t('name: the username at last', Rules::displayName([], 'jane'), 'jane');
 
+/* 1.3.0: the provider is the master for name and e-mail */
+$u = ['name' => 'Old Name', 'email' => 'old@example.org'];
+t('profile: both change', Rules::profileChanges($u, ['given_name' => 'New', 'family_name' => 'Name', 'email' => 'new@example.org'], 'x'), ['name' => 'New Name', 'email' => 'new@example.org']);
+t('profile: given + family win over name', Rules::profileChanges($u, ['name' => 'Display', 'given_name' => 'Given', 'family_name' => 'Fam'], 'x'), ['name' => 'Given Fam']);
+t('profile: e-mail differing only in case', Rules::profileChanges($u, ['name' => 'Old Name', 'email' => 'OLD@Example.org'], 'x'), []);
+t('profile: empty claims', Rules::profileChanges($u, ['name' => '', 'email' => ''], 'x'), []);
+t('profile: invalid e-mail', Rules::profileChanges($u, ['email' => 'not an address'], 'x'), []);
+t('profile: e-mail another user has', Rules::profileChanges($u, ['name' => 'New', 'email' => 'taken@example.org'], 'x', [7]), ['name' => 'New']);
+t('profile: control characters and spaces', Rules::profileChanges($u, ['name' => "A\x01B   C"], 'x'), ['name' => 'A B C']);
+
 echo ($fail ? "FAILED $fail of $n\n" : "ok $n\n");
 exit($fail ? 1 : 0);

@@ -87,6 +87,15 @@ page's history and the PHP error log. Switch off: the module works exactly as 1.
 In Pocket ID: *Application Configuration → Enable self-account editing* **off**. Otherwise anyone
 could give themselves the email of a user here and log in as them.
 
+## Name and e-mail follow the provider (off by default, 1.3.0)
+
+Tick **Keep name and e-mail the same as at the provider, at every log-in** on the *Log-in accounts*
+page (setting `oidclogin_sync_profile`). At each log-in the user's name (first + last name when the
+provider gives them, else its `name` claim) and e-mail are written from the provider. Never a global
+administrator, never an empty or invalid value, never an e-mail that another user already has. Every
+change is in the page's history with the old value, so it can be put back by hand. Turn it on only
+when people cannot edit their own name and e-mail at the provider.
+
 ## Logout
 
 Omeka's own Logout runs as always and ends Omeka's session first. For a person who logged in

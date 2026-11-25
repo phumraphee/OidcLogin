@@ -236,7 +236,7 @@ class Module extends AbstractModule
     {
         $this->loadOwnClasses();
         $settings = $services->get('Omeka\Settings');
-        foreach (array_merge(array_keys(self::SETTINGS), [Links::SEEN, 'oidclogin_auto', 'oidclogin_group_roles', 'oidclogin_selfedit_off']) as $id) {
+        foreach (array_merge(array_keys(self::SETTINGS), [Links::SEEN, 'oidclogin_auto', 'oidclogin_sync_profile', 'oidclogin_group_roles', 'oidclogin_selfedit_off']) as $id) {
             $settings->delete($id);
         }
         $services->get('Omeka\Connection')->executeStatement(

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 — 2026-11-25
+
+- New, off by default: **Keep name and e-mail the same as at the provider, at every log-in**
+  (checkbox on Log-in accounts, setting `oidclogin_sync_profile`). The provider is then the
+  master: at each log-in the user's name and e-mail are written from the provider's claims
+  (first + last name when given, else `name`). Never a global administrator, never an empty or
+  invalid value, never an e-mail another user already has. Every change is in the history on
+  that page with the old value (the undo list).
+
 ## 1.2.1 — 2026-11-23
 
 - Logout with Pocket ID 2.19.3 and later: the end-session request now carries
